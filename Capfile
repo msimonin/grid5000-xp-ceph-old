@@ -5,6 +5,15 @@
 require "xp5k"
 require "yaml"
 
+# Configure SSH for capistrano
+#
+conn_config = File.join(ENV["HOME"], ".xpm", "connection.rb")
+
+
+if File.exist?(conn_config)
+  load conn_config
+end
+
 
 # Load ./xp.conf file
 #
@@ -19,7 +28,7 @@ def xp; @xp; end
 
 # Defaults configuration
 #
-XP5K::Config[:scenario]   ||= 'paranoia_4nodes_16osds_ext4'
+XP5K::Config[:scenario]   ||= 'paranoia_4nodes_16osds_ext4.yaml'
 XP5K::Config[:walltime]   ||= '1:00:00'
 XP5K::Config[:user]       ||= ENV['USER']
 
@@ -69,7 +78,7 @@ job_description = {
   :name       => "ceph_frontend",
   :roles      => [
     XP5K::Role.new({ :name => 'frontend', :size => 1 }),  # For the puppet master
-    XP5K::Role.new({ :name => 'computes', :size => 1 })
+    XP5K::Role.new({ :name => 'ceph_radosgw', :size => 1 }) # radosgw
   ],
   :command    => "sleep 186400"
 }
@@ -82,16 +91,11 @@ xp.define_job(job_description)
 xp.define_deployment({
   :site           => scenario['site'],
   :environment    => "wheezy-x64-base",
-  :roles          => %w{ frontend ceph_nodes computes },
-  :key            => File.read(XP5K::Config[:public_key]),
+  :roles          => %w{ frontend ceph_nodes ceph_radosgw },
+  :key            => File.read("#{ssh_public}"),
   :notifications  => ["xmpp:#{XP5K::Config[:user]}@jabber.grid5000.fr"]
 })
 
-
-# Configure SSH for capistrano
-#
-set :gateway, XP5K::Config[:gateway] if XP5K::Config[:gateway]
-set :ssh_config, XP5K::Config[:ssh_config] if XP5K::Config[:ssh_config]
 
 
 # Define roles
@@ -102,6 +106,10 @@ end
 
 role :ceph_nodes do
   xp.role_with_name("ceph_nodes").servers
+end
+
+role :ceph_radosgw do
+  xp.role_with_name("ceph_radosgw").servers
 end
 
 
@@ -162,7 +170,7 @@ end
 #
 namespace :provision do
   desc "Install puppet agent"
-  task :setup_agent, :roles => [:frontend, :ceph_nodes] do
+  task :setup_agent, :roles => [:frontend, :ceph_nodes, :ceph_radosgw] do
     set :user, "root"
     run 'apt-get update && apt-get -y install curl wget'
     run "http_proxy=http://proxy:3128 https_proxy=http://proxy:3128 wget -O /tmp/puppet_install.sh https://raw.githubusercontent.com/pmorillon/puppet-puppet/master/extras/bootstrap/puppet_install.sh"
@@ -187,15 +195,23 @@ namespace :provision do
   before 'provision:nodes', 'provision:upload_modules'
 
   desc "Provision nodes"
-  task :nodes, :roles => :ceph_nodes, :on_error => :continue do
+  task :nodes, :roles => [:ceph_nodes], :on_error => :continue do
+    set :user, "root"
+    run "http_proxy=http://proxy:3128 https_proxy=http://proxy:3128 puppet agent -t --server #{xp.role_with_name("frontend").servers.first}"
+  end
+
+  desc "provision radosgw"
+  task :radosgw, :roles => [:ceph_radosgw] do
     set :user, "root"
     run "http_proxy=http://proxy:3128 https_proxy=http://proxy:3128 puppet agent -t --server #{xp.role_with_name("frontend").servers.first}"
   end
 
   desc "Upload modules on Puppet master"
-  task :upload_modules do
+  task :upload_modules, :roles => [:frontend] do
+    set :user, "root"
     unless synced
-      %x{rsync -e '#{SSH_CMD}' -rl --delete --exclude '.git*' #{sync_path} root@#{xp.role_with_name("frontend").servers.first}:/srv}
+      #%x{rsync -e '#{SSH_CMD}' -rl --delete --exclude '.git*' #{sync_path} root@#{xp.role_with_name("frontend").servers.first}:/srv}
+      upload "#{sync_path}", "/srv/.", :via => :scp, :recursive => :true
       synced = true
     end
   end
@@ -270,15 +286,20 @@ end
 # Manage the Hiera database
 #
 def generateHieraDatabase
-  %x{rm -f provision/hiera/db/*}
+  %x{rm -f provision/hiera/db/}
   xpconfig = {
-    'frontend'   => xp.role_with_name("frontend").servers.first,
-    'ceph_nodes' => xp.role_with_name("ceph_nodes").servers,
-    'vlan'       => xp.job_with_name("ceph_nodes")['resources_by_type']['vlans'].first,
-    'ceph_fsid'  => '7D8EF28C-11AB-4532-830C-FC87A4C6A200'
+    'frontend'     => xp.role_with_name("frontend").servers.first,
+    'ceph_nodes'   => xp.role_with_name("ceph_nodes").servers,
+    'ceph_radosgw' => xp.role_with_name("ceph_radosgw").servers.first,
+    'vlan'         => xp.job_with_name("ceph_nodes")['resources_by_type']['vlans'].first,
+    'ceph_fsid'    => '7D8EF28C-11AB-4532-830C-FC87A4C6A200',
+    'auth'         => 'none',
+    'user'         => 'test',
+    'secret_key'   => '12345',
+    'access_key'   => '12345' 
   }
   xpconfig.merge!(YAML.load(File.read("scenarios/#{XP5K::Config[:scenario]}.yaml")))
-  FileUtils.mkdir('provision/hiera/db') if not Dir.exists?('provision/hiera/db')
+  FileUtils.mkdir_p('provision/hiera/db') if not Dir.exists?('provision/hiera/db')
   File.open('provision/hiera/db/xp.yaml', 'w') do |file|
     file.puts xpconfig.to_yaml
   end
@@ -290,6 +311,16 @@ def generateHieraDatabase
       file.puts classes.to_yaml
     end
   end
+
+  classes = {
+    'classes' => %w{ xp::radosgw }
+  }
+  xp.role_with_name("ceph_radosgw").servers.each do |node|
+    File.open("provision/hiera/db/#{node}.yaml", 'w') do |file|
+      file.puts classes.to_yaml
+    end
+  end
+
 end
 
 

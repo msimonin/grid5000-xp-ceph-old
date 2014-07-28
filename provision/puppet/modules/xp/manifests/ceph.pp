@@ -10,7 +10,9 @@ class xp::ceph {
   $osd_devices = $node_description['osd']
   $fs = hiera('filesystem')
   $fsid = hiera('ceph_fsid')
+  $auth = hiera('auth')
   $nodes = hiera_array('ceph_nodes')
+  $radosgw_host = hiera('ceph_radosgw')
   $vlan_id = hiera('vlan')
   $cluster_network_interface = hiera('cluster_network_interface')
 

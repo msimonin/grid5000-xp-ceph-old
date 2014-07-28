@@ -9,7 +9,10 @@ class xp::puppet::master {
     group  => root
   }
 
-  $agents       = hiera_array('ceph_nodes')
+  $nodes        = hiera_array('ceph_nodes') 
+  $radosgw      = hiera_array('ceph_radosgw')
+  # concatenate (don't want to use stdlib for that)
+  $agents       = split(inline_template("<%= (nodes + radosgw).join(',') %>"),',')
   $version      = '3.4.2-1puppetlabs1'
   $frontend     = hiera('frontend')
 

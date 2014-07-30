@@ -72,7 +72,7 @@ xp.define_job(job_description)
 #
 job_description = {
   :resources  => %{nodes=2,walltime=#{XP5K::Config[:walltime]}},
-  :site       => XP5K::Config[:site] || scenario['site'] || 'rennes',
+  :site       => XP5K::Config[:site] || scenario[:site] || 'rennes',
   :queue      => 'default',
   :types      => ["deploy"],
   :name       => "ceph_frontend",
@@ -91,7 +91,15 @@ xp.define_job(job_description)
 xp.define_deployment({
   :site           => scenario['site'],
   :environment    => "wheezy-x64-base",
-  :roles          => %w{ frontend ceph_nodes ceph_radosgw },
+  :roles          => %w{ ceph_nodes},
+  :key            => File.read("#{ssh_public}"),
+  :notifications  => ["xmpp:#{XP5K::Config[:user]}@jabber.grid5000.fr"]
+})
+
+xp.define_deployment({
+  :site           => scenario['site'],
+  :environment    => "wheezy-x64-base",
+  :roles          => %w{ frontend ceph_radosgw },
   :key            => File.read("#{ssh_public}"),
   :notifications  => ["xmpp:#{XP5K::Config[:user]}@jabber.grid5000.fr"]
 })

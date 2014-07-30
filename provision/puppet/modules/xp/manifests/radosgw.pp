@@ -1,12 +1,16 @@
 class xp::radosgw {
 
-  include xp::ntp
-  include xp::ceph
+  require xp::ntp
+  require xp::ceph
   require xp::radosgw::apache
 
 
   package { 'radosgw':
     ensure => installed
+  }
+
+  service { 'radosgw':
+    ensure => running
   }
   
   $user = hiera('user')
@@ -18,6 +22,7 @@ class xp::radosgw {
     command => "radosgw-admin user create --uid=${user} --display-name=${user} --secret=${secret_key} --access-key=${access_key}",
     require => Package['radosgw']
   }
+
 
 }
 

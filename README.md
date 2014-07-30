@@ -37,7 +37,7 @@ Create the file `xp.conf` into the `grid5000-xp-ceph` directory.
 
 	# OAR jobs defaults
 	walltime        '2:00:00'
-		
+
 	# SSH configuration
 	public_key      File.expand_path '~/.ssh/id_rsa.pub'
 
@@ -53,7 +53,7 @@ You can work from your workstation without to connect onto a Grid'5000 frontend.
 
 	$ git clone git@github.com:pmorillon/grid5000-xp-ceph.git
 	$ cd grid5000-xp-ceph
-	
+
 #### Install Rugygems dependencies with Bundler
 
 Assuming that you use [RVM](https://rvm.io/) (Ruby Version Manager) :
@@ -73,7 +73,7 @@ Create the file `xp.conf` into the `grid5000-xp-ceph` directory.
 
 	# Your Grid'5000 login
 	user            'mylogin'
-		
+
 	# SSH configuration
 	public_key      File.expand_path '~/.ssh/id_rsa_g5k_external.pub'
 	gateway         "#{self[:user]}@frontend.rennes.grid5000.fr"
@@ -119,7 +119,10 @@ Here we use the default scenario described in the file `scenarios/paranoia_4node
 	$ cap start
 	$ cap provision:nodes
 
-	
+The following install the rados object gateway
+	$ cap provision:radosgw
+
+
 ### Open a shell on the first node of the Ceph cluster
 
 	$ cap ssh:ceph
@@ -133,7 +136,7 @@ Here we use the default scenario described in the file `scenarios/paranoia_4node
       pgmap v31: 192 pgs, 3 pools, 9470 bytes data, 21 objects
             11368 MB used, 8344 GB / 8802 GB avail
                  192 active+clean
-    
+
 	root@paranoia-2:~# ceph osd pool set data pg_num 1024
 	set pool 0 pg_num to 1024
 	root@paranoia-2:~# ceph osd pool set data pgp_num 1024
@@ -152,26 +155,26 @@ Here we use the default scenario described in the file `scenarios/paranoia_4node
 	# id	weight	type name	up/down	reweight
 	-1	16	root default
 	-3	4		host paranoia-4
-	10	1			osd.10	up	1	
+	10	1			osd.10	up	1
 	11	1			osd.11	up	1
-	8	1			osd.8	up	1	
-	9	1			osd.9	up	1	
+	8	1			osd.8	up	1
+	9	1			osd.9	up	1
 	-4	4		host paranoia-3
-	4	1			osd.4	up	1	
-	7	1			osd.7	up	1	
-	6	1			osd.6	up	1	
-	5	1			osd.5	up	1	
+	4	1			osd.4	up	1
+	7	1			osd.7	up	1
+	6	1			osd.6	up	1
+	5	1			osd.5	up	1
 	-2	4		host paranoia-2
-	3	1			osd.3	up	1	
-	0	1			osd.0	up	1	
-	2	1			osd.2	up	1	
-	1	1			osd.1	up	1	
+	3	1			osd.3	up	1
+	0	1			osd.0	up	1
+	2	1			osd.2	up	1
+	1	1			osd.1	up	1
 	-5	4		host paranoia-5
-	12	1			osd.12	up	1	
-	14	1			osd.14	up	1	
-	15	1			osd.15	up	1	
-	13	1			osd.13	up	1	
-	
+	12	1			osd.12	up	1
+	14	1			osd.14	up	1
+	15	1			osd.15	up	1
+	13	1			osd.13	up	1
+
 
 
 ### Open a shell on the frontend (puppetmaster)
@@ -188,7 +191,7 @@ Here we use the default scenario described in the file `scenarios/paranoia_4node
 ### Stop the experiment
 
 	$ cap oar:clean
-	
+
 ### Use reservation mode to start the experiment later
 
 Edit `./xp.conf` file and add the `reservation` option :

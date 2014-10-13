@@ -28,8 +28,8 @@ def xp; @xp; end
 
 # Defaults configuration
 #
-XP5K::Config[:scenario]   ||= 'paranoia_4nodes_16osds_ext4.yaml'
-XP5K::Config[:walltime]   ||= '1:00:00'
+XP5K::Config[:scenario]   ||= 'paranoia_8nodes_24osds_ext4.yaml'
+XP5K::Config[:walltime]   ||= '11:00:00'
 XP5K::Config[:user]       ||= ENV['USER']
 
 # Constants
